@@ -1,0 +1,27 @@
+{
+    "php.validate.enable": false,
+    "[php]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "php.suggest.basic": false,
+    "intelephense.diagnostics.undefinedFunctions": false,
+    "intelephense.diagnostics.undefinedConstants": false,
+    "intelephense.diagnostics.undefinedClassConstants": false,
+    "intelephense.diagnostics.undefinedProperties": false,
+    "intelephense.diagnostics.undefinedMethods": false,
+    "intelephense.diagnostics.undefinedTypes": false,
+    "intelephense.diagnostics.undefinedVariable": false,
+    "intelephense.completion.fullyQualifyGlobalConstantsAndFunctions": false,
+    "files.exclude": {
+        "**/.git": true,
+        "**/.gitignore": true,
+        "**/node_modules": true,
+        "**/vendor": true,
+        "**/.env": true
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    }
+}
