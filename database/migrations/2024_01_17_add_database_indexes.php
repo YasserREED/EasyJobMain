@@ -11,36 +11,36 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Add foreign key indexes and constraints for better performance
+        // Add performance indexes for frequently queried columns
+        // Only add indexes that don't already exist in create table migrations
+
         Schema::table('cv_services', function (Blueprint $table) {
-            $table->index('user_id');
+            // user_id index already exists from foreignId()
             $table->index('region');
             $table->index('created_at');
         });
 
         Schema::table('cv_frees', function (Blueprint $table) {
-            $table->index('user_id');
+            // user_id index already exists from foreignId()
             $table->index('region');
             $table->index('created_at');
         });
 
         Schema::table('payments', function (Blueprint $table) {
-            $table->index('user_id');
+            // user_id index already exists from foreignId()
+            // tran_ref unique constraint already exists in create_payments_table
             $table->index(['tran_ref', 'created_at']);
-            $table->unique('tran_ref');
         });
 
-        Schema::table('user_infos', function (Blueprint $table) {
-            $table->index('user_id');
-        });
+        // user_infos: user_id index already exists from foreignId(), no additional indexes needed
 
         Schema::table('discounts', function (Blueprint $table) {
-            $table->index('coupon');
+            // coupon index already exists in create_discounts_table migration
             $table->index('status');
         });
 
         Schema::table('companies', function (Blueprint $table) {
-            $table->index('region');
+            // region index already exists in create_companies_table migration
             $table->index('domain');
         });
     }
@@ -51,34 +51,24 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('cv_services', function (Blueprint $table) {
-            $table->dropIndex(['user_id']);
             $table->dropIndex(['region']);
             $table->dropIndex(['created_at']);
         });
 
         Schema::table('cv_frees', function (Blueprint $table) {
-            $table->dropIndex(['user_id']);
             $table->dropIndex(['region']);
             $table->dropIndex(['created_at']);
         });
 
         Schema::table('payments', function (Blueprint $table) {
-            $table->dropIndex(['user_id']);
             $table->dropIndex(['tran_ref', 'created_at']);
-            $table->dropUnique(['tran_ref']);
-        });
-
-        Schema::table('user_infos', function (Blueprint $table) {
-            $table->dropIndex(['user_id']);
         });
 
         Schema::table('discounts', function (Blueprint $table) {
-            $table->dropIndex(['coupon']);
             $table->dropIndex(['status']);
         });
 
         Schema::table('companies', function (Blueprint $table) {
-            $table->dropIndex(['region']);
             $table->dropIndex(['domain']);
         });
     }
