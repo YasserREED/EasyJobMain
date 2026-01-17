@@ -25,7 +25,7 @@ class CvController extends Controller
     /**
      * Get a specific CV by ID.
      */
-    public function show(Request $request, string $id): CvServiceResource|void
+    public function show(Request $request, string $id): CvServiceResource
     {
         $cv = CvService::findOrFail($id);
 

@@ -25,7 +25,7 @@ class PaymentController extends Controller
     /**
      * Get a specific payment by ID.
      */
-    public function show(Request $request, string $id): PaymentResource|void
+    public function show(Request $request, string $id): PaymentResource
     {
         $payment = Payment::findOrFail($id);
 
