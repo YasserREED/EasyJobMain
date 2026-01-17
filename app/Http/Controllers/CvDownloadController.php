@@ -22,7 +22,7 @@ class CvDownloadController extends Controller
      *
      * @throws AuthorizationException
      */
-    public function downloadFreeCv(string $id): StreamedResponse|void
+    public function downloadFreeCv(string $id): StreamedResponse
     {
         $cv = CvFree::findOrFail($id);
 
@@ -39,7 +39,7 @@ class CvDownloadController extends Controller
      *
      * @throws AuthorizationException
      */
-    public function downloadCvService(string $id): StreamedResponse|void
+    public function downloadCvService(string $id): StreamedResponse
     {
         $cv = CvService::findOrFail($id);
 

@@ -64,7 +64,4 @@ class CvFree extends Model
     {
         return $query->where('user_id', $userId);
     }
-        }
-        return $result;
-    }
 }
