@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 
 use Auth;
-use App\Models\cv_free;
+use App\Models\CvFree;
 use App\Models\UserInfo;
 
 use App\Models\Company;
@@ -52,21 +52,21 @@ class FreeCvController extends Controller
         $isAuthenticated = Auth::check();
 
         $rules = [
-            'subject' => ['bail','required', 'string', 'max:60'],
-            'region' => ['bail','required', 'integer', 'between:1,3'],
-            'domain' => ['bail','required', 'string', 'max:55', 'exists:companies,domain'],
-            'fullname' => ['bail','required', 'string', 'max:80' , 'full_name_parts'],
-            'age' => ['bail','required', 'integer', 'between:1,5'],
-            'qualifications' => ['bail','required', 'string', 'max:60'],
-            'university' => ['bail','required', 'string', 'max:60'],
-            'major' => ['bail','required', 'string', 'max:60'],
-            'work' => ['bail','nullable', 'string', 'max:60'],
-            'experince' => ['bail','nullable', 'integer','max:60'],
-            'birthday' => ['bail','required', 'date', 'before_or_equal:' . now()->subYears(18)->format('Y-m-d')],
-            'gender' => ['bail','required', 'integer', 'between:1,2'],
-            'socialStatus' => ['bail','required', 'integer', 'between:1,3'],
-            'nationality' => ['bail','required', 'string', 'max:10'],
-            'linkedin' => ['bail','nullable', 'string', 'max:80'],
+            'subject' => ['bail', 'required', 'string', 'max:60'],
+            'region' => ['bail', 'required', 'integer', 'between:1,3'],
+            'domain' => ['bail', 'required', 'string', 'max:55', 'exists:companies,domain'],
+            'fullname' => ['bail', 'required', 'string', 'max:80', 'full_name_parts'],
+            'age' => ['bail', 'required', 'integer', 'between:1,5'],
+            'qualifications' => ['bail', 'required', 'string', 'max:60'],
+            'university' => ['bail', 'required', 'string', 'max:60'],
+            'major' => ['bail', 'required', 'string', 'max:60'],
+            'work' => ['bail', 'nullable', 'string', 'max:60'],
+            'experince' => ['bail', 'nullable', 'integer', 'max:60'],
+            'birthday' => ['bail', 'required', 'date', 'before_or_equal:' . now()->subYears(18)->format('Y-m-d')],
+            'gender' => ['bail', 'required', 'integer', 'between:1,2'],
+            'socialStatus' => ['bail', 'required', 'integer', 'between:1,3'],
+            'nationality' => ['bail', 'required', 'string', 'max:10'],
+            'linkedin' => ['bail', 'nullable', 'string', 'max:80'],
             'file' => [
                 'required',
                 'bail',
@@ -78,7 +78,7 @@ class FreeCvController extends Controller
                 new SafeFilename(), // Validate the filename for security
             ],
         ];
-        
+
         // If the user is not authenticated (guest), add registration-related rules
         if (!$isAuthenticated) {
             $rules += [
@@ -100,37 +100,144 @@ class FreeCvController extends Controller
             'birthday.before_or_equal' => 'يجب أن يكون عمرك 18 عامًا أو أكثر لإستخدام هذه الخدمة',
         ]);
 
-        
+
         if ($isAuthenticated) {
             // Handle the case for authenticated users
 
             // Check if the user has used the service before
             $userID = Auth::id();
-            if (cv_free::where('user_id', $userID)->exists()) {
+            if (CvFree::where('user_id', $userID)->exists()) {
                 // User has used the service before
                 alert()->info('لقد استخدمت الخدمة من قبل')->showConfirmButton('حسناً');
                 return redirect()->route('cv.show');
             } else {
 
+                $file = $request->file('file');
+                $fileName = uniqid() . '.' . $file->extension();
+
+                $destinationPath = "CVs";
+
+                if (!Storage::disk('public')->exists($destinationPath)) {
+                    Storage::disk('public')->makeDirectory($destinationPath);
+                }
+
+                $fileFinal = File::get($file);
+
+                Storage::disk('public')->put($destinationPath . '/' . $fileName, $fileFinal);
+
+                $filelink = Storage::url($destinationPath . '/' . $fileName);
+
+
+                $newUserInfo = UserInfo::updateOrCreate([
+                    'user_id'   => Auth::id(),
+                ], [
+                    'fullname' => $request->fullname,
+                    'age' => $request->age,
+                    'qualifications' => $request->qualifications,
+                    'university' => $request->university,
+                    'major' => $request->major,
+                    'work' => $request->work,
+                    'experince' => $request->experince,
+                    'birthDay' => $request->birthday,
+                    'gender' => $request->gender,
+                    'socialStatus' => $request->socialStatus,
+                    'nationality' => $request->nationality,
+                    'linkedin' => $request->linkedin,
+                ]);
+
+                $newCV = CvFree::create([
+                    'user_id'   => Auth::id(),
+                    'subject' => $request->subject,
+                    'region' => $request->region,
+                    'domain' => $request->domain,
+                    'cv_file' => $fileName,
+                ]);
+
+                if ($newCV && $newUserInfo) {
+                    // Success: Model was created
+
+                    $userEmail = Auth::user()->email;
+                    $userPhone = Auth::user()->phone;
+                    $userName = Auth::user()->name;
+                    $region = $request->region;
+                    $domain = $request->domain;
+
+                    $subject = $request->subject;
+                    $linkedin = $request->linkedin;
+
+                    $plan = 4; // free plan
+                    $CV = secure_url($filelink);
+
+                    // Split the full name into an array of parts
+                    $nameParts = explode(' ', $request->fullname);
+
+                    // Take the first two parts
+                    $firstTwoParts = implode(' ', array_slice($nameParts, 0, 2));
+
+                    // Send Emails
+                    dispatch(new SendEmails($CV, $plan, $region, $domain, $subject, $userEmail, $userPhone, $userName, $firstTwoParts, $linkedin));
+
+                    alert()->success('تم الإرسال بنجاح')->showConfirmButton('حسناً');
+                    return redirect()->route('cv.show');
+                } else {
+                    // Error: Model creation failed
+                    alert()->error('فشلت عملية الإرسال')->showConfirmButton('حسناً');
+                    return redirect()->back();
+                }
+            }
+        } else {
+            // Handle the case for guest registration
+
+            // Rate Limiting
+            $rateLimitKey = 'sms_verification.' . $request->ip();
+            $rateLimitMaxAttempts = 5; // Adjust as needed
+            $rateLimitDecayMinutes = 60; // Adjust as needed
+
+            if (RateLimiter::tooManyAttempts($rateLimitKey, $rateLimitMaxAttempts)) {
+                return back()->withErrors(['error' => 'تم  الكشف عن العديد من طلبات التحقق عبر الرسائل النصية. الرجاء المحاولة مرة أخرى في وقت لاحق.']);
+            }
+
+            try {
+                event(new Registered($user = $this->sendSMS($request->all())));
+            } catch (RestException $e) {
+                // Handle Twilio REST API-related errors
+                return back()->withErrors(['error' => 'رقم غير صحيح , فشلت عملية الإرسال']);
+            } catch (VerificationException $e) {
+                // Handle Twilio verification-related errors
+                return back()->withErrors(['error' => 'رقم غير صحيح , فشلت عملية الإرسال']);
+            }
+
+            RateLimiter::hit($rateLimitKey, $rateLimitDecayMinutes);
+
+
             $file = $request->file('file');
-            $fileName = uniqid().'.'.$file->extension();
-    
+            $fileName = uniqid() . '.' . $file->extension();
+
             $destinationPath = "CVs";
-    
-            if(!Storage::disk('public')->exists($destinationPath)){
+
+            if (!Storage::disk('public')->exists($destinationPath)) {
                 Storage::disk('public')->makeDirectory($destinationPath);
             }
-            
+
             $fileFinal = File::get($file);
-            
-            Storage::disk('public')->put($destinationPath . '/'.$fileName, $fileFinal);
-    
-            $filelink = Storage::url($destinationPath.'/'.$fileName);
-    
-            
-            $newUserInfo = UserInfo::updateOrCreate([
-                'user_id'   => Auth::id(),
-            ],[
+
+            Storage::disk('public')->put($destinationPath . '/' . $fileName, $fileFinal);
+
+            $filelink = Storage::url($destinationPath . '/' . $fileName);
+
+            $request->session()->flush();
+
+            session([
+                'name' => $request->name,
+                'email' => $request->email,
+                'phoneNum' => $request->dial_code,
+                'password' => $request->password,
+                'verification' => true,
+                'subject' => $request->subject,
+                'region' => $request->region,
+                'domain' => $request->domain,
+                'cv_file' => $fileName,
+                'filelink' => $filelink,
                 'fullname' => $request->fullname,
                 'age' => $request->age,
                 'qualifications' => $request->qualifications,
@@ -144,133 +251,19 @@ class FreeCvController extends Controller
                 'nationality' => $request->nationality,
                 'linkedin' => $request->linkedin,
             ]);
-
-            $newCV = cv_free::create([
-                'user_id'   => Auth::id(),
-                'subject' => $request->subject,
-                'region' => $request->region,
-                'domain' => $request->domain,
-                'cv_file' => $fileName,
-            ]);
-    
-            if ($newCV && $newUserInfo) {
-            // Success: Model was created
-    
-                $userEmail = Auth::user()->email;
-                $userPhone = Auth::user()->phone;
-                $userName = Auth::user()->name;
-                $region = $request->region;
-                $domain = $request->domain;
-
-                $subject = $request->subject;
-                $linkedin = $request->linkedin;
-
-                $plan = 4; // free plan
-                $CV = secure_url($filelink);
-
-                // Split the full name into an array of parts
-                $nameParts = explode(' ', $request->fullname);
-
-                // Take the first two parts
-                $firstTwoParts = implode(' ', array_slice($nameParts, 0, 2));
-
-                // Send Emails
-                dispatch(new SendEmails($CV, $plan, $region,$domain,$subject,$userEmail,$userPhone,$userName,$firstTwoParts,$linkedin));
-    
-                alert()->success('تم الإرسال بنجاح')->showConfirmButton('حسناً');
-                return redirect()->route('cv.show');
-    
-            } else {
-                // Error: Model creation failed
-                alert()->error('فشلت عملية الإرسال')->showConfirmButton('حسناً');
-                return redirect()->back();
-    
-            }
+            return $request->wantsJson()
+                ? new JsonResponse([], 201)
+                : redirect()->route('cv.free.verify');
         }
-        } else {
-        // Handle the case for guest registration
-
-        // Rate Limiting
-        $rateLimitKey = 'sms_verification.' . $request->ip();
-        $rateLimitMaxAttempts = 5; // Adjust as needed
-        $rateLimitDecayMinutes = 60; // Adjust as needed
-
-        if (RateLimiter::tooManyAttempts($rateLimitKey, $rateLimitMaxAttempts)) {
-            return back()->withErrors(['error' => 'تم  الكشف عن العديد من طلبات التحقق عبر الرسائل النصية. الرجاء المحاولة مرة أخرى في وقت لاحق.']);
-        }
-
-        try {
-            event(new Registered($user = $this->sendSMS($request->all())));
-        } catch (RestException $e) {
-            // Handle Twilio REST API-related errors
-            return back()->withErrors(['error' => 'رقم غير صحيح , فشلت عملية الإرسال']);
-        } catch (VerificationException $e) {
-            // Handle Twilio verification-related errors
-            return back()->withErrors(['error' => 'رقم غير صحيح , فشلت عملية الإرسال']);
-        }
-        
-        RateLimiter::hit($rateLimitKey, $rateLimitDecayMinutes);
-
-
-        $file = $request->file('file');
-        $fileName = uniqid().'.'.$file->extension();
-
-        $destinationPath = "CVs";
-
-        if(!Storage::disk('public')->exists($destinationPath)){
-            Storage::disk('public')->makeDirectory($destinationPath);
-        }
-        
-        $fileFinal = File::get($file);
-        
-        Storage::disk('public')->put($destinationPath . '/'.$fileName, $fileFinal);
-
-        $filelink = Storage::url($destinationPath.'/'.$fileName);
-
-        $request->session()->flush();
-
-        session([
-            'name' => $request->name,
-            'email' => $request->email,
-            'phoneNum' => $request->dial_code,
-            'password' => $request->password,
-            'verification' => true,
-            'subject' => $request->subject,
-            'region' => $request->region,
-            'domain' => $request->domain,
-            'cv_file' => $fileName,
-            'filelink' => $filelink,
-            'fullname' => $request->fullname,
-            'age' => $request->age,
-            'qualifications' => $request->qualifications,
-            'university' => $request->university,
-            'major' => $request->major,
-            'work' => $request->work,
-            'experince' => $request->experince,
-            'birthDay' => $request->birthday,
-            'gender' => $request->gender,
-            'socialStatus' => $request->socialStatus,
-            'nationality' => $request->nationality,
-            'linkedin' => $request->linkedin,
-        ]);
-        return $request->wantsJson()
-                    ? new JsonResponse([], 201)
-                    : redirect()->route('cv.free.verify');
-
-        }
-    
-
     }
 
     public function verifyPhone(Request $request)
     {
         if ($request->session()->has('phoneNum')) {
             return view('client.CV.sms');
+        }
 
-        }	
-        
         return redirect()->route('register');
-
     }
     protected function sendSMS(array $data)
     {
@@ -295,15 +288,14 @@ class FreeCvController extends Controller
 
         try {
 
-        /* Get credentials from .env */
-        $token = getenv("TWILIO_AUTH_TOKEN");
-        $twilio_sid = getenv("TWILIO_SID");
-        $twilio_verify_sid = getenv("TWILIO_VERIFY_SID");
-        $twilio = new Client($twilio_sid, $token);
-        $verification = $twilio->verify->v2->services($twilio_verify_sid)
-        ->verificationChecks
-        ->create(['code' => $data['verification_code'], 'to' => $data['phone']]);
-            
+            /* Get credentials from .env */
+            $token = getenv("TWILIO_AUTH_TOKEN");
+            $twilio_sid = getenv("TWILIO_SID");
+            $twilio_verify_sid = getenv("TWILIO_VERIFY_SID");
+            $twilio = new Client($twilio_sid, $token);
+            $verification = $twilio->verify->v2->services($twilio_verify_sid)
+                ->verificationChecks
+                ->create(['code' => $data['verification_code'], 'to' => $data['phone']]);
         } catch (RestException $e) {
             // Handle Twilio REST API-related errors
             return redirect()->route('verify')->withErrors(['error' => 'رمز تحقق خاطىء']);
@@ -326,7 +318,7 @@ class FreeCvController extends Controller
 
             $newUserInfo = UserInfo::updateOrCreate([
                 'user_id'   => $user_id,
-            ],[
+            ], [
                 'fullname' => Session::get('fullname'),
                 'age' => Session::get('age'),
                 'qualifications' => Session::get('qualifications'),
@@ -341,17 +333,17 @@ class FreeCvController extends Controller
                 'linkedin' => Session::get('linkedin'),
             ]);
 
-            $newCV = cv_free::create([
+            $newCV = CvFree::create([
                 'user_id'   => $user_id,
                 'subject' => Session::get('subject'),
                 'region' => Session::get('region'),
                 'domain' => Session::get('domain'),
                 'cv_file' => Session::get('cv_file'),
             ]);
-    
+
             if ($newCV && $newUserInfo) {
-            // Success: Model was created
-    
+                // Success: Model was created
+
                 $userEmail = $user->email;
                 $userPhone = $user->phone;
                 $userName = $user->name;
@@ -370,21 +362,19 @@ class FreeCvController extends Controller
 
                 // Take the first two parts
                 $firstTwoParts = implode(' ', array_slice($nameParts, 0, 2));
-                
+
                 // Send Emails
-                dispatch(new SendEmails($CV, $plan, $region,$domain,$subject,$userEmail,$userPhone,$userName,$firstTwoParts,$linkedin));
-    
+                dispatch(new SendEmails($CV, $plan, $region, $domain, $subject, $userEmail, $userPhone, $userName, $firstTwoParts, $linkedin));
+
                 $request->session()->flush();
 
-                Auth::login($user);    
+                Auth::login($user);
                 alert()->success('تم الإرسال بنجاح')->showConfirmButton('حسناً');
                 return redirect()->route('cv.show');
-    
             } else {
                 // Error: Model creation failed
                 alert()->error('فشلت عملية الإرسال')->showConfirmButton('حسناً');
                 return redirect()->back();
-    
             }
         }
         return back()->with(['phone' => $data['phone']])->withErrors(['error' => 'رمز التحقق غير صحيح']);

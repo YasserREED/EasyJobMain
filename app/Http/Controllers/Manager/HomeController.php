@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 use App\Models\User;
-use App\Models\cvService;
+use App\Models\CvService;
 use App\Models\Contact;
-use App\Models\cv_free;
+use App\Models\CvFree;
 
 
 use LaravelDaily\LaravelCharts\Classes\LaravelChart;
@@ -23,8 +23,8 @@ class HomeController extends Controller
     public function index()
     {
         $userCount = User::count();
-        $CVCount = cvService::count();
-        $FreeCVCount = cv_free::count();
+        $CVCount = CvService::count();
+        $FreeCVCount = CvFree::count();
 
 
         $chart_options = [
@@ -49,8 +49,8 @@ class HomeController extends Controller
         ];
         $chart2 = new LaravelChart($chart_options2);
 
-        
-        return view('manager.home', compact('userCount','CVCount','FreeCVCount','chart1','chart2'));
+
+        return view('manager.home', compact('userCount', 'CVCount', 'FreeCVCount', 'chart1', 'chart2'));
     }
 
     public function users()

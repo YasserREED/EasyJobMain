@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 
 use Auth;
-use App\Models\cvService;
-use App\Models\cv_free;
+use App\Models\CvService;
+use App\Models\CvFree;
 use App\Models\Company;
 use App\Models\Payment;
 use App\Models\Discount;
@@ -38,32 +38,31 @@ class CvController extends Controller
 
     public function index()
     {
-        $storedService = cvService::where('user_id',Auth::user()->id)->latest()->first();
-        if(empty($storedService)){
-        $storedService = cv_free::where('user_id',Auth::user()->id)->latest()->first();
+        $storedService = CvService::where('user_id', Auth::user()->id)->latest()->first();
+        if (empty($storedService)) {
+            $storedService = CvFree::where('user_id', Auth::user()->id)->latest()->first();
         }
-        $storedData = UserInfo::where('user_id',Auth::user()->id)->first();
-        return view('client.CV.CV',compact('storedData','storedService'));
+        $storedData = UserInfo::where('user_id', Auth::user()->id)->first();
+        return view('client.CV.CV', compact('storedData', 'storedService'));
     }
 
-    
+
 
     public function domains(Request $request)
     {
         $this->validate($request, [
             'region' => 'required|integer|between:1,3',
         ]);
-        
+
         $region = $request->input('region');
         // Perform a query to get the available domains for the selected region
         $availableDomains = Company::where('region', $region)->groupBy('domain')->pluck('domain');
-    
+
         if ($availableDomains->isEmpty()) {
             return response()->json(['' => 'No domains available']);
         }
-    
+
         return response()->json($availableDomains);
-    
     }
 
     public function getPrice($plan)
@@ -112,21 +111,21 @@ class CvController extends Controller
 
         $this->validate($request, [
             'subject' => ['bail', 'required', 'string', 'max:60'],
-            'region' => ['bail','required', 'integer','between:1,3'],
-            'domain' => ['bail','required', 'string', 'max:55','exists:companies,domain'], // depends on the dataSet
-            'discount' => ['bail', 'nullable','max:255'],
-            'fullname' => ['bail','required', 'string', 'max:80' , 'full_name_parts'],
-            'age' => ['bail','required', 'integer', 'between:1,5'],
-            'qualifications' => ['bail','required', 'string', 'max:60'],
-            'university' => ['bail','required', 'string', 'max:60'],
-            'major' => ['bail','required', 'string', 'max:60'],
-            'work' => ['bail','nullable', 'string', 'max:60'],
-            'experince' => ['bail','nullable', 'integer','max:60'],
-            'birthday' => ['bail','required', 'date', 'before_or_equal:' . now()->subYears(18)->format('Y-m-d')],
-            'gender' => ['bail','required', 'integer', 'between:1,2'],
-            'socialStatus' => ['bail','required', 'integer', 'between:1,3'],
-            'nationality' => ['bail','required', 'string', 'max:10'],
-            'linkedin' => ['bail','nullable', 'string', 'max:80'],
+            'region' => ['bail', 'required', 'integer', 'between:1,3'],
+            'domain' => ['bail', 'required', 'string', 'max:55', 'exists:companies,domain'], // depends on the dataSet
+            'discount' => ['bail', 'nullable', 'max:255'],
+            'fullname' => ['bail', 'required', 'string', 'max:80', 'full_name_parts'],
+            'age' => ['bail', 'required', 'integer', 'between:1,5'],
+            'qualifications' => ['bail', 'required', 'string', 'max:60'],
+            'university' => ['bail', 'required', 'string', 'max:60'],
+            'major' => ['bail', 'required', 'string', 'max:60'],
+            'work' => ['bail', 'nullable', 'string', 'max:60'],
+            'experince' => ['bail', 'nullable', 'integer', 'max:60'],
+            'birthday' => ['bail', 'required', 'date', 'before_or_equal:' . now()->subYears(18)->format('Y-m-d')],
+            'gender' => ['bail', 'required', 'integer', 'between:1,2'],
+            'socialStatus' => ['bail', 'required', 'integer', 'between:1,3'],
+            'nationality' => ['bail', 'required', 'string', 'max:10'],
+            'linkedin' => ['bail', 'nullable', 'string', 'max:80'],
             'file' => [
                 'bail',
                 'nullable',
@@ -138,53 +137,57 @@ class CvController extends Controller
                 new NotExecutableFile(), // Ensure the file is not executable
                 new SafeFilename(), // Validate the filename for security
             ],
-            'selectedPlan' => ['bail','required', 'integer','between:1,3'],
+            'selectedPlan' => ['bail', 'required', 'integer', 'between:1,3'],
 
         ], [
             'birthday.before_or_equal' => 'يجب أن يكون عمرك 18 عامًا أو أكثر لإستخدام هذه الخدمة',
         ]);
 
+        try {
+            if ($request->hasFile('file')) {
 
-    if ($request->hasFile('file')) {
+                $file = $request->file('file');
+                $fileName = uniqid() . '.' . $file->extension();
 
-        $file = $request->file('file');
-        $fileName = uniqid().'.'.$file->extension();
+                $destinationPath = "CVs";
 
-        $destinationPath = "CVs";
+                if (!Storage::disk('public')->exists($destinationPath)) {
+                    Storage::disk('public')->makeDirectory($destinationPath);
+                }
 
-        if(!Storage::disk('public')->exists($destinationPath)){
-            Storage::disk('public')->makeDirectory($destinationPath);
+                $fileFinal = File::get($file);
+
+                Storage::disk('public')->put($destinationPath . '/' . $fileName, $fileFinal);
+
+                $filelink = Storage::url($destinationPath . '/' . $fileName);
+            } else {
+                // If the 'file' field is empty, look for the file in the database
+                $storedService = CvService::where('user_id', Auth::user()->id)->latest()->first();
+                if (empty($storedService)) {
+                    $storedService = CvFree::where('user_id', Auth::user()->id)->latest()->first();
+                }
+
+                if ($storedService) {
+                    $destinationPath = "CVs";
+                    $filelink = Storage::url($destinationPath . '/' . $storedService->cv_file); // 'cv_file' is the column that holds the file name 
+                    $fileName = $storedService->cv_file;
+                } else {
+                    // Return an error if the file field is empty, and there's no stored data in the database
+                    return back()->withErrors(['file' => 'يرجى إرفاق السيرة الذاتية']);
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('File upload error: ' . $e->getMessage());
+            return back()->withErrors(['file' => 'حدث خطأ أثناء رفع الملف. يرجى المحاولة مرة أخرى']);
         }
-        
-        $fileFinal = File::get($file);
-        
-        Storage::disk('public')->put($destinationPath . '/'.$fileName, $fileFinal);
 
-        $filelink = Storage::url($destinationPath.'/'.$fileName);
-
-    }else{
-        // If the 'file' field is empty, look for the file in the database
-        $storedService = cvService::where('user_id', Auth::user()->id)->latest()->first();
-        if (empty($storedService)) {
-            $storedService = cv_free::where('user_id', Auth::user()->id)->latest()->first();
-        }
-    
-        if ($storedService) {
-            $destinationPath = "CVs";
-            $filelink = Storage::url($destinationPath . '/' . $storedService->cv_file); // 'cv_file' is the column that holds the file name 
-            $fileName = $storedService->cv_file;
-        } else {
-            // Return an error if the file field is empty, and there's no stored data in the database
-            return back()->withErrors(['file' => 'يرجى إرفاق السيرة الذاتية']);
-        }
-    }
-        $price = $this->getPrice($request->selectedPlan);
+        $price = $this->getPrice((int) $request->selectedPlan);
 
         if ($request->has('discount') && !empty($request->discount)) {
-            $coupon = Discount::where('coupon', $request->discount)
+            $coupon = Discount::where('coupon', trim($request->discount))
                 ->where('status', 1);
             if ($coupon->exists()) {
-                $per = $coupon->first()->discount;
+                $per = (int) $coupon->first()->discount;
 
                 $discountAmount = $this->caldiscount($price, $per);
                 $price = $price - $discountAmount;
@@ -195,46 +198,45 @@ class CvController extends Controller
             }
         }
 
-        if($price > 0){
-        session([
-            'subject' => $request->subject,
-            'region' => $request->region,
-            'domain' => $request->domain,
-            'cv_file' => $fileName,
-            'filelink' => $filelink,
-            'plan' => $request->selectedPlan,
-            'fullname' => $request->fullname,
-            'age' => $request->age,
-            'qualifications' => $request->qualifications,
-            'university' => $request->university,
-            'major' => $request->major,
-            'work' => $request->work,
-            'experince' => $request->experince,
-            'birthDay' => $request->birthday,
-            'gender' => $request->gender,
-            'socialStatus' => $request->socialStatus,
-            'nationality' => $request->nationality,
-            'linkedin' => $request->linkedin,
+        if ($price > 0) {
+            session([
+                'subject' => trim($request->subject),
+                'region' => (int) $request->region,
+                'domain' => trim($request->domain),
+                'cv_file' => $fileName,
+                'filelink' => $filelink,
+                'plan' => $request->selectedPlan,
+                'fullname' => $request->fullname,
+                'age' => $request->age,
+                'qualifications' => $request->qualifications,
+                'university' => $request->university,
+                'major' => $request->major,
+                'work' => $request->work,
+                'experince' => $request->experince,
+                'birthDay' => $request->birthday,
+                'gender' => $request->gender,
+                'socialStatus' => $request->socialStatus,
+                'nationality' => $request->nationality,
+                'linkedin' => $request->linkedin,
 
-        ]);
+            ]);
 
-        // Payment
+            // Payment
 
-        $pay= paypage::sendPaymentCode('all')
-        ->sendTransaction('sale')
-        ->sendCart(00,$price,$this->getName($request->selectedPlan))
-        ->sendURLs(route('cv.payment.verify'), route('cv.index'))
-        ->sendHideShipping(true)
-        ->sendUserDefined(["plan"=>$request->selectedPlan])
-        ->sendLanguage('ar')
-        ->create_pay_page();
+            $pay = paypage::sendPaymentCode('all')
+                ->sendTransaction('sale')
+                ->sendCart(00, $price, $this->getName($request->selectedPlan))
+                ->sendURLs(route('cv.payment.verify'), route('cv.index'))
+                ->sendHideShipping(true)
+                ->sendUserDefined(["plan" => $request->selectedPlan])
+                ->sendLanguage('ar')
+                ->create_pay_page();
 
-        return $pay;
-
-        }else{
+            return $pay;
+        } else {
             // handle 100% coupons
 
-            $newCV = cvService::create([
+            $newCV = CvService::create([
                 'user_id'   => Auth::id(),
                 'subject' => $request->subject,
                 'region' => $request->region,
@@ -246,7 +248,7 @@ class CvController extends Controller
 
             $newUserInfo = UserInfo::updateOrCreate([
                 'user_id'   => Auth::id(),
-            ],[
+            ], [
                 'fullname' => $request->fullname,
                 'age' => $request->age,
                 'qualifications' => $request->qualifications,
@@ -266,141 +268,153 @@ class CvController extends Controller
                 // Success: Model was created
                 Discount::find($coupon->first()->id)->increment('count');
 
-                    $userEmail = Auth::user()->email;
-                    $userPhone = Auth::user()->phone;
-                    $userName = Auth::user()->name;
-                    $region = $request->region;
-                    $domain = $request->domain;
-                    $subject = $request->subject;
-                    $plan = $request->selectedPlan;
-                    $linkedin = $request->linkedin;
+                $userEmail = Auth::user()->email;
+                $userPhone = Auth::user()->phone;
+                $userName = Auth::user()->name;
+                $region = $request->region;
+                $domain = $request->domain;
+                $subject = $request->subject;
+                $plan = $request->selectedPlan;
+                $linkedin = $request->linkedin;
 
-                    $CV = secure_url($fileName);
+                $CV = secure_url($fileName);
 
-                    // Split the full name into an array of parts
-                    $nameParts = explode(' ', $request->fullname);
+                // Split the full name into an array of parts
+                $nameParts = explode(' ', $request->fullname);
 
-                    // Take the first two parts
-                    $firstTwoParts = implode(' ', array_slice($nameParts, 0, 2));
+                // Take the first two parts
+                $firstTwoParts = implode(' ', array_slice($nameParts, 0, 2));
 
-                    // Send Emails
-                    dispatch(new SendEmails($CV, $plan, $region,$domain,$subject,$userEmail,$userPhone,$userName,$firstTwoParts,$linkedin));
-        
-                    alert()->success('تم الإرسال بنجاح')->showConfirmButton('حسناً');
-                    return redirect()->route('cv.show');
-        
-                } else {
-                    // Error: Model creation failed
-                    alert()->error('فشلت عملية الإرسال')->showConfirmButton('حسناً');
-                    return redirect()->back();
-        
-                }
+                // Send Emails
+                dispatch(new SendEmails($CV, $plan, $region, $domain, $subject, $userEmail, $userPhone, $userName, $firstTwoParts, $linkedin));
+
+                alert()->success('تم الإرسال بنجاح')->showConfirmButton('حسناً');
+                return redirect()->route('cv.show');
+            } else {
+                // Error: Model creation failed
+                alert()->error('فشلت عملية الإرسال')->showConfirmButton('حسناً');
+                return redirect()->back();
+            }
         }
     }
 
     public function show()
     {
-        $list = cvService::where('user_id',Auth::id())->get();
-        $freeList = cv_free::where('user_id',Auth::id())->get();
+        $list = CvService::where('user_id', Auth::id())->get();
+        $freeList = CvFree::where('user_id', Auth::id())->get();
 
-        return view('client.CV.list',compact('list','freeList'));
+        return view('client.CV.list', compact('list', 'freeList'));
     }
 
     public function verify(Request $request)
     {
 
         $this->validate($request, [
-            'tranRef' => ['bail', 'required', 'string', 'max:50','unique:payments,tran_ref'],
+            'tranRef' => ['bail', 'required', 'string', 'max:50', 'unique:payments,tran_ref'],
         ]);
-        
-        $transaction = Paypage::queryTransaction($request->tranRef);
-        
 
-        if($transaction->success){
+        try {
+            $transaction = Paypage::queryTransaction(trim($request->tranRef));
 
-            if ($request->session()->has('couponid')) {
-            $coupon = session('couponid');
-            Discount::find($coupon)->increment('count');
+            if ($transaction->success) {
+
+                $couponId = null;
+                if ($request->session()->has('couponid')) {
+                    $couponId = (int) session('couponid');
+                    // Verify coupon still exists and is valid
+                    $coupon = Discount::find($couponId);
+                    if ($coupon && $coupon->status == 1) {
+                        $coupon->increment('count');
+                    } else {
+                        \Log::warning('Invalid coupon used: ' . $couponId . ' by user ' . Auth::id());
+                    }
+                }
+
+                // Validate all session data before creation
+                $sessionData = [
+                    'subject' => Session::get('subject'),
+                    'region' => (int) Session::get('region'),
+                    'domain' => Session::get('domain'),
+                    'cv_file' => Session::get('cv_file'),
+                    'plan' => (int) Session::get('plan'),
+                ];
+
+                // Validate ranges
+                if (!in_array($sessionData['region'], [1, 2, 3]) || !in_array($sessionData['plan'], [1, 2, 3])) {
+                    \Log::error('Invalid session data detected for user: ' . Auth::id());
+                    return back()->withErrors(['error' => 'البيانات المرسلة غير صحيحة']);
+                }
+
+                $newCV = CvService::create($sessionData);
+
+                $newUserInfo = UserInfo::updateOrCreate([
+                    'user_id'   => Auth::id(),
+                ], [
+                    'fullname' => trim(Session::get('fullname')),
+                    'age' => (int) Session::get('age'),
+                    'qualifications' => trim(Session::get('qualifications')),
+                    'university' => trim(Session::get('university')),
+                    'major' => trim(Session::get('major')),
+                    'work' => trim(Session::get('work')),
+                    'experince' => (int) Session::get('experince'),
+                    'birthDay' => Session::get('birthDay'),
+                    'gender' => (int) Session::get('gender'),
+                    'socialStatus' => (int) Session::get('socialStatus'),
+                    'nationality' => trim(Session::get('nationality')),
+                    'linkedin' => trim(Session::get('linkedin')),
+                ]);
+
+                $payment = Payment::create([
+                    'user_id'   => Auth::id(),
+                    'cv_service' => $newCV->id,
+                    'tran_ref' => trim($request->tranRef),
+                    'cart_description' => trim($transaction->cart_description ?? ''),
+                    'cart_currency' => trim($transaction->cart_currency ?? ''),
+                    'tran_total' => (float) $transaction->tran_total,
+                    'customer_name' => trim($transaction->customer_details->name ?? ''),
+                    'customer_email' => trim($transaction->customer_details->email ?? ''),
+                    'payment_method' => trim($transaction->payment_info->payment_method ?? ''),
+                    'trace' => trim($transaction->trace ?? ''),
+                    'discount_id' => $couponId
+                ]);
+
+                if ($newCV && $payment && $newUserInfo) {
+                    // Success: Model was created
+
+                    $userEmail = Auth::user()->email;
+                    $userPhone = Auth::user()->phone;
+                    $userName = Auth::user()->name;
+                    $region = (int) Session::get('region');
+                    $domain = trim(Session::get('domain'));
+                    $subject = trim(Session::get('subject'));
+                    $plan = (int) Session::get('plan');
+                    $linkedin = trim(Session::get('linkedin') ?? '');
+                    $CV = secure_url(Session::get('filelink'));
+
+                    // Split the full name into an array of parts
+                    $nameParts = explode(' ', trim(Session::get('fullname')));
+
+                    // Take the first two parts
+                    $firstTwoParts = implode(' ', array_slice($nameParts, 0, 2));
+
+                    // Send Emails
+                    dispatch(new SendEmails($CV, $plan, $region, $domain, $subject, $userEmail, $userPhone, $userName, $firstTwoParts, $linkedin));
+
+                    alert()->success('تم الإرسال بنجاح')->showConfirmButton('حسناً');
+                    return redirect()->route('cv.show');
+                } else {
+                    // Error: Model creation failed
+                    alert()->error('فشلت عملية الإرسال')->showConfirmButton('حسناً');
+                    return redirect()->back();
+                }
             } else {
-            $coupon = null;
+                alert()->error('فشلت عملية الدفع')->showConfirmButton('حسناً');
+                return redirect()->route('cv.show');
             }
-
-        $newCV = cvService::create([
-            'user_id'   => Auth::id(),
-            'subject' => Session::get('subject'),
-            'region' => Session::get('region'),
-            'domain' => Session::get('domain'),
-            'cv_file' => Session::get('cv_file'),
-            'plan' => Session::get('plan'),
-        ]);
-
-        $newUserInfo = UserInfo::updateOrCreate([
-            'user_id'   => Auth::id(),
-        ],[
-            'fullname' => Session::get('fullname'),
-            'age' => Session::get('age'),
-            'qualifications' => Session::get('qualifications'),
-            'university' => Session::get('university'),
-            'major' => Session::get('major'),
-            'work' => Session::get('work'),
-            'experince' => Session::get('experince'),
-            'birthDay' => Session::get('birthDay'),
-            'gender' => Session::get('gender'),
-            'socialStatus' => Session::get('socialStatus'),
-            'nationality' => Session::get('nationality'),
-            'linkedin' => Session::get('linkedin'),
-        ]);
-        
-        $payment = Payment::create([
-            'user_id'   => Auth::id(),
-            'cv_service' => $newCV->first()->id,
-            'tran_ref' => $request->tranRef,
-            'cart_description' => $transaction->cart_description,
-            'cart_currency' => $transaction->cart_currency,
-            'tran_total' => $transaction->tran_total,
-            'customer_name' => $transaction->customer_details->name,
-            'customer_email' => $transaction->customer_details->email,
-            'payment_method' => $transaction->payment_info->payment_method,
-            'trace' => $transaction->trace,
-            'discount_id' => $coupon
-        ]);
-        if ($newCV && $payment && $newUserInfo) {
-        // Success: Model was created
-
-            $userEmail = Auth::user()->email;
-            $userPhone = Auth::user()->phone;
-            $userName = Auth::user()->name;
-            $region = Session::get('region');
-            $domain = Session::get('domain');
-            $subject = Session::get('subject');
-            $plan = Session::get('plan');
-            $linkedin = Session::get('linkedin');
-            $CV = secure_url(Session::get('filelink'));
-
-
-            // Split the full name into an array of parts
-            $nameParts = explode(' ', Session::get('fullname'));
-
-            // Take the first two parts
-            $firstTwoParts = implode(' ', array_slice($nameParts, 0, 2));
-            
-            // Send Emails
-            dispatch(new SendEmails($CV, $plan, $region,$domain,$subject,$userEmail,$userPhone,$userName,$firstTwoParts,$linkedin));
-
-            alert()->success('تم الإرسال بنجاح')->showConfirmButton('حسناً');
-            return redirect()->route('cv.show');
-
-        } else {
-            // Error: Model creation failed
-            alert()->error('فشلت عملية الإرسال')->showConfirmButton('حسناً');
+        } catch (\Exception $e) {
+            \Log::error('Payment verification error: ' . $e->getMessage(), ['user_id' => Auth::id()]);
+            alert()->error('حدث خطأ أثناء التحقق من الدفع')->showConfirmButton('حسناً');
             return redirect()->back();
-
         }
-    }else{
-        alert()->error('فشلت عملية الدفع')->showConfirmButton('حسناً');
-        return redirect()->route('cv.show');
-
-    }
-
     }
 }

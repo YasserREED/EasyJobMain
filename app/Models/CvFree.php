@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CvService extends Model
+class CvFree extends Model
 {
     use HasFactory;
 
-    protected $table = 'cv_services';
+    protected $table = 'cv_frees';
 
     protected $fillable = [
         'user_id',
@@ -19,7 +19,6 @@ class CvService extends Model
         'region',
         'domain',
         'cv_file',
-        'plan',
     ];
 
 
@@ -34,22 +33,12 @@ class CvService extends Model
         return \Storage::url("CVs/" . $this->cv_file);
     }
 
+
     public function planText()
     {
 
-        switch ($this->plan) {
-            case 1:
-                $result = '<span class="badge badge-primary">بريميوم</span>';
-                break;
-            case 2:
-                $result = '<span class="badge badge-warning">بريميوم بلس</span>';
-                break;
-            case 3:
-                $result = '<span class="badge badge-dark">بريميوم برو</span>';
-                break;
-            default:
-                $result = '<span class="badge badge-secondary">Unknown</span>';
-        }
+        $result = '<span class="badge badge-info">الباقة المجانية</span>';
+
         return $result;
     }
 
