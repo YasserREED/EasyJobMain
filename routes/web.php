@@ -50,4 +50,8 @@ Route::group(['middleware' => ['auth', 'validate.session']], function () {
     Route::get('/CVs', [App\Http\Controllers\CvController::class, 'show'])->name('cv.show');
 
     Route::get('/CVs/check', [App\Http\Controllers\CvController::class, 'domains'])->middleware('throttle:30,1')->name('cv.domains');
+
+    // Secure CV download routes
+    Route::get('/download/cv/free/{id}', [App\Http\Controllers\CvDownloadController::class, 'downloadFreeCv'])->name('cv.free.download');
+    Route::get('/download/cv/service/{id}', [App\Http\Controllers\CvDownloadController::class, 'downloadCvService'])->name('cv.service.download');
 });

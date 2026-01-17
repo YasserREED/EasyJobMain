@@ -25,9 +25,29 @@ class Payment extends Model
         'trace',
     ];
 
-
+    /**
+     * Get the user that made this payment.
+     */
     public function user(): BelongsTo
     {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the CV service for this payment.
+     */
+    public function cvService(): BelongsTo
+    {
+        return $this->belongsTo(CvService::class, 'cv_service');
+    }
+
+    /**
+     * Get the discount used in this payment.
+     */
+    public function discount(): BelongsTo
+    {
+        return $this->belongsTo(Discount::class);
+    }
         return $this->belongsTo(User::class);
     }
 

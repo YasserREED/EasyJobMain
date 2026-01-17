@@ -25,8 +25,15 @@ class UserInfo extends Model
         'experince',
         'nationality',
         'linkedin',
-
     ];
+
+    /**
+     * Get the user that owns this information.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
 
     public function user(): BelongsTo

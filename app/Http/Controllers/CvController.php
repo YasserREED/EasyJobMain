@@ -300,8 +300,8 @@ class CvController extends Controller
 
     public function show()
     {
-        $list = CvService::where('user_id', Auth::id())->get();
-        $freeList = CvFree::where('user_id', Auth::id())->get();
+        $list = CvService::forUser(Auth::id())->with('user')->get();
+        $freeList = CvFree::forUser(Auth::id())->with('user')->get();
 
         return view('client.CV.list', compact('list', 'freeList'));
     }

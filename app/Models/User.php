@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -23,7 +25,6 @@ class User extends Authenticatable
         'phone',
         'password',
         'isVerified',
-
     ];
 
     /**
@@ -46,9 +47,43 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-
-    public function freeService()
+    /**
+     * Get the user's free CV service.
+     */
+    public function freeCv(): HasOne
     {
-        return $this->hasOne('App\Models\cv_free');
+        return $this->hasOne(CvFree::class);
+    }
+
+    /**
+     * Get all of the user's paid CV services.
+     */
+    public function cvServices(): HasMany
+    {
+        return $this->hasMany(CvService::class);
+    }
+
+    /**
+     * Get the user's information.
+     */
+    public function userInfo(): HasOne
+    {
+        return $this->hasOne(UserInfo::class);
+    }
+
+    /**
+     * Get all of the user's payments.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Scope: Get users with their CVs (eager loaded).
+     */
+    public function scopeWithCvs($query)
+    {
+        return $query->with('cvServices', 'freeCv', 'userInfo');
     }
 }
